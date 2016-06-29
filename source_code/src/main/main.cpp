@@ -449,7 +449,7 @@ int main(int argc, char* argv[]) {
     "\n\
     #################################################################\n\
     #                                                               #\n\
-    #        VinaXB: a program optimized for halogen bonding        #\n\
+    #       VinaSH: a program optimized for sigma hole bonding      #\n\
     #                                                               #\n\
     #      Code modified from Autodock Vina by Grant Schmadeke      #\n\
     #                   Sirimulla Research Group                    #\n\
@@ -457,9 +457,9 @@ int main(int argc, char* argv[]) {
     #                www.sirimullaresearchgroup.com                 #\n\
     #                                                               #\n\
     # Please cite:                                                  #\n\
-    # Koebel, et al. 'AutoDock VinaXB: Implementation of XBSF, new  #\n\
-    # empirical halogen scoring function, into AutoDock Vina.'      #\n\
-    # Journal of cheminformatics xxx                                #\n\
+    # Koebel, et al. 'Theory and Principals of Sulfur Bonding in    #\n\
+    # Protein-Ligand Interactions'                                  #\n\
+    # Journal of Chemical Information and Modeling xxx              #\n\
     # Currently under review.                                       #\n\
     #                                                               #\n\
     #################################################################\n";
@@ -468,10 +468,10 @@ int main(int argc, char* argv[]) {
     "\n\
     #################################################################\n\
     #                                                               #\n\
-    # For more information, please see github.com/ssirimulla/vinaXB #\n\
+    # For more information, please see github.com/ssirimulla/vinaSH #\n\
     # or visit www.sirimullaresearchgroup.com/software              #\n\
     #                                                               #\n\
-    #                  Thank you for using VinaXB                   #\n\
+    #                  Thank you for using VinaSH                   #\n\
     #                                                               #\n\
     #################################################################\n";
 
