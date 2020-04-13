@@ -70,6 +70,8 @@ inline fl quaternion_norm_sqr(const qt& q) { // equivalent to sqr(boost::math::a
 	return sqr(q.R_component_1()) + sqr(q.R_component_2()) + sqr(q.R_component_3()) + sqr(q.R_component_4());
 }
 
+bool quaternion_is_normalized(const qt& q);
+
 inline void quaternion_normalize(qt& q) {
 	const fl s = quaternion_norm_sqr(q);
 	assert(eq(s, sqr(boost::math::abs(q))));
@@ -96,5 +98,6 @@ qt random_orientation(rng& generator);
 void quaternion_increment(qt& q, const vec& rotation);
 vec quaternion_difference(const qt& b, const qt& a); // rotation that needs to be applied to convert a to b
 void print(const qt& q, std::ostream& out = std::cout); // print as an angle
+void getV(const qt& q, std::vector<double> &out);
 
 #endif

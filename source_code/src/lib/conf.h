@@ -85,6 +85,11 @@ struct rigid_change {
 		::print(position);
 		::print(orientation);
 	}
+	void getV( std::vector<double>& out)
+	{
+		::getV(position,out);
+		::getV(orientation,out);
+	}
 };
 
 struct rigid_conf {
@@ -135,7 +140,14 @@ struct rigid_conf {
 	void print() const {
 		::print(position);
 		::print(orientation);
+	} 
+
+	void getV(std::vector<double> & out)
+	{
+		::getV(position,out);
+		::getV(orientation,out);
 	}
+
 private:
 	friend class boost::serialization::access;
 	template<class Archive>
@@ -151,6 +163,14 @@ struct ligand_change {
 	void print() const {
 		rigid.print();
 		printnl(torsions);
+	}
+	void getV(std::vector<double> & out)
+	{
+		rigid.getV(out);
+		for (int i=0;i<torsions.size();i++)
+		{
+			out.push_back(torsions[i]);
+		}
 	}
 };
 
@@ -173,6 +193,15 @@ struct ligand_conf {
 		rigid.print();
 		printnl(torsions);
 	}
+
+	void getV(std::vector<double> & out)
+	{
+		rigid.getV(out);
+		for (int i=0;i<torsions.size();i++)
+		{
+			out.push_back(torsions[i]);
+		}
+	}
 private:
 	friend class boost::serialization::access;
 	template<class Archive>
@@ -186,6 +215,13 @@ struct residue_change {
 	flv torsions;
 	void print() const {
 		printnl(torsions);
+	}
+	void getV(std::vector<double>& out)
+	{
+		for (int i=0;i<torsions.size();i++)
+		{
+			out.push_back(torsions[i]);
+		}
 	}
 };
 
@@ -202,6 +238,13 @@ struct residue_conf {
 	}
 	void print() const {
 		printnl(torsions);
+	}
+	void getV(std::vector<double>& out)
+	{
+		for (int i=0;i<torsions.size();i++)
+		{
+			out.push_back(torsions[i]);
+		}
 	}
 private:
 	friend class boost::serialization::access;
@@ -269,6 +312,12 @@ struct change {
 			ligands[i].print();
 		VINA_FOR_IN(i, flex)
 			flex[i].print();
+	}
+	void getV(std::vector<double>& out)  {
+		VINA_FOR_IN(i, ligands)
+			ligands[i].getV(out);
+		VINA_FOR_IN(i, flex)
+			flex[i].getV(out);
 	}
 };
 
@@ -345,8 +394,15 @@ struct conf {
 			ligands[i].print();
 		VINA_FOR_IN(i, flex)
 			flex[i].print();
+	} 
+	void getV(std::vector<double>& out)
+	{
+		VINA_FOR_IN(i, ligands)
+			ligands[i].getV(out);
+		VINA_FOR_IN(i, flex)
+			flex[i].getV(out);
 	}
-private:
+	private:
 	friend class boost::serialization::access;
 	template<class Archive>
 	void serialize(Archive & ar, const unsigned version) {

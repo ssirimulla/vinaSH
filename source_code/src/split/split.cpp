@@ -38,7 +38,8 @@
 using boost::filesystem::path;
 
 path make_path(const std::string& str) {
-    return path(str);  //, boost::filesystem::native);
+//	return path(str, boost::filesystem::native);
+	return path(str);
 }
 
 std::string default_prefix(const std::string& input_name, const std::string& add) {
@@ -136,17 +137,17 @@ int main(int argc, char* argv[]) {
 	const std::string version_string = "AutoDock Vina PDBQT Split 1.1.2 (May 11, 2011)";
 
 	const std::string error_message = "\n\n\
-    Please contact the author, Dr. Oleg Trott <ot14@columbia.edu>, so\n\
-    that this problem can be resolved. The reproducibility of the\n\
-    error may be vital, so please remember to include the following in\n\
-    your problem report:\n\
-    * the EXACT error message,\n\
-    * your version of the program,\n\
-    * the computer system you are running it on,\n\
-    * command line and configuration file options,\n\
-    * input (if possible),\n\
-    \n\
-    Thank you!\n";
+Please contact the author, Dr. Oleg Trott <ot14@columbia.edu>, so\n\
+that this problem can be resolved. The reproducibility of the\n\
+error may be vital, so please remember to include the following in\n\
+your problem report:\n\
+* the EXACT error message,\n\
+* your version of the program,\n\
+* the computer system you are running it on,\n\
+* command line and configuration file options,\n\
+* input (if possible),\n\
+\n\
+Thank you!\n";
 
 	try {
 		std::string input_name, ligand_prefix = "ligand_", flex_prefix = "flex_";
@@ -208,7 +209,7 @@ int main(int argc, char* argv[]) {
 		write_multimodel_pdbqt(tmp, ligand_prefix, flex_prefix);
 	}
 	catch(file_error& e) {
-		std::cerr << "\n\nError: could not open \"" << e.name.string() << "\" for " << (e.in ? "reading" : "writing") << ".\n";
+		std::cerr << "\n\nError: could not open " << e.name << " for " << (e.in ? "reading" : "writing") << ".\n";
 		return 1;
 	}
 	catch(boost::filesystem::filesystem_error& e) {
@@ -220,7 +221,7 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 	catch(parse_error& e) {
-		std::cerr << "\n\nParse error on line " << e.line << " in file \"" << e.file.string() << "\": " << e.reason << '\n';
+		std::cerr << "\n\nParse error on line " << e.line << " in file " << e.file << " : " << e.reason << '\n';
 		return 1;
 	}
 	catch(std::bad_alloc&) {

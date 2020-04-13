@@ -236,7 +236,6 @@ void terms::eval_additive_aux(const model& m, const atom_index& i, const atom_in
             out[k] += distance_additive_terms[k].eval(a, b, r, theta_rounded);
 
 	offset += distance_additive_terms.size();
-    
 	VINA_FOR_IN(k, usable_terms)
         if(r < usable_terms[k].cutoff){
             

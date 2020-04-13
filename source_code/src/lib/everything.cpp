@@ -93,7 +93,6 @@ struct ad4_solvation : public distance_additive {
 };
 
 inline fl optimal_distance(sz xs_t1, sz xs_t2) {
-
 	return xs_radius(xs_t1) + xs_radius(xs_t2);
 }
 

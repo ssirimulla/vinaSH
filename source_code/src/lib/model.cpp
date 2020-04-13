@@ -780,12 +780,14 @@ fl model::eval_deriv  (const precalculate& p, const igrid& ig, const vec& v, con
 	// calculate derivatives
 	ligands.derivative(coords, minus_forces, g.ligands);
 	flex   .derivative(coords, minus_forces, g.flex); // inflex forces are ignored
+	//printf("v=[%lf,%lf,%lf]\n",v[0],v[1],v[2]);
 	return e;
 }
 
 fl model::eval_intramolecular(const precalculate& p, const vec& v, const conf& c) {
 	set(c);
 	fl e = 0;
+
 	// internal for each ligand
 	VINA_FOR_IN(i, ligands)
 		e += eval_interacting_pairs(p, v[0], ligands[i].pairs, coords, atoms);   // coords instead of internal coords
