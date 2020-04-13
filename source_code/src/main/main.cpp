@@ -34,6 +34,7 @@
 #include <boost/filesystem/exception.hpp>
 #include <boost/filesystem/convenience.hpp> // filesystem::basename
 #include <boost/thread/thread.hpp> // hardware_concurrency // FIXME rm ?
+#include <boost/date_time/posix_time/posix_time.hpp> // for time in microseconds
 #include "parse_pdbqt.h"
 #include "parallel_mc.h"
 #include "file.h"
@@ -47,11 +48,13 @@
 #include "quasi_newton.h"
 #include "tee.h"
 #include "coords.h" // add_to_output_container
+//#include <ctime>
 
 using boost::filesystem::path;
+using namespace boost::posix_time;
 
 path make_path(const std::string& str) {
-    return path(str); //, boost::filesystem::native);
+	return path(str);
 }
 
 void doing(int verbosity, const std::string& str, tee& log) {
@@ -118,7 +121,7 @@ void do_randomization(model& m,
 }
 
 void refine_structure(model& m, const precalculate& prec, non_cache& nc, output_type& out, const vec& cap, sz max_steps = 1000) {
-	change g(m.get_size());
+	change g(m.get_size());//initialized to be all zeros, and fit to the size of the model
 	quasi_newton quasi_newton_par;
 	quasi_newton_par.max_steps = max_steps;
 	const fl slope_orig = nc.slope;
@@ -199,7 +202,7 @@ void do_search(model& m, const boost::optional<model>& ref, const scoring_functi
         
 		VINA_CHECK(weights.size() == term_values.size() + 1);
 		fl e2 = 0;
-		VINA_FOR_IN(i, term_values) 
+		VINA_FOR_IN(i, term_values)
 			e2 += term_values[i] * weights[i];
 		e2 = sf.conf_independent(m, e2);
 		if(e < 100 && std::abs(e2 - e) > 0.05) {
@@ -233,13 +236,29 @@ void do_search(model& m, const boost::optional<model>& ref, const scoring_functi
 		log << "Using random seed: " << seed;
 		log.endl();
 		output_container out_cont;
+
+//		time_t start,end;
 		doing(verbosity, "Performing search", log);
+		ptime time_start(microsec_clock::local_time());
+//		time(&start);
+
 		par(m, out_cont, prec, ig, prec_widened, ig_widened, corner1, corner2, generator);
 		done(verbosity, log);
 
 		doing(verbosity, "Refining results", log);
 		VINA_FOR_IN(i, out_cont)
 			refine_structure(m, prec, nc, out_cont[i], authentic_v, par.mc.ssd_par.evals);
+
+		ptime time_end(microsec_clock::local_time());
+		time_duration duration(time_end - time_start);
+//		time(&end);
+//		printf("\nsearching finished in %.3lf seconds\n",difftime(end,start));
+//		printf("\nsearching finished in %.3lf seconds\n",(duration.total_milliseconds()/1000.0));
+		log << std::string("\nsearching finished in ");
+		log.setf(std::ios::fixed, std::ios::floatfield);
+		log.setf(std::ios::showpoint);
+		log<< std::setprecision(3) << (duration.total_milliseconds()/1000.0);
+		log << std::string(" seconds"); log.endl();log.flush();
 
 		if(!out_cont.empty()) {
 			out_cont.sort();
@@ -354,10 +373,13 @@ void main_procedure(model& m, const boost::optional<model>& ref, // m is non-con
 		}
 		else {
 			bool cache_needed = !(score_only || randomize_only || local_only);
+			//TODO read the grid if available
 			if(cache_needed) doing(verbosity, "Analyzing the binding site", log);
 			cache c("scoring_function_version001", gd, slope, atom_type::XS);
 			if(cache_needed) c.populate(m, prec, m.get_movable_atom_types(prec.atom_typing_used()));
+//			if(cache_needed) c.populateparalell(m, prec, m.get_movable_atom_types(prec.atom_typing_used()),false, cpu);
 			if(cache_needed) done(verbosity, log);
+			//TODO write the grid if requested to do
 			do_search(m, ref, wt, prec, c, prec, c, nc,
 					  out_name,
 					  corner1, corner2,
@@ -425,44 +447,54 @@ model parse_bundle(const boost::optional<std::string>& rigid_name_opt, const boo
 
 int main(int argc, char* argv[]) {
 	using namespace boost::program_options;
-	const std::string version_string = "AutoDock Vina 1.1.2 (May 11, 2011)";
+	const std::string version_string = "QuickVina 2.1 (24 Dec, 2017)";
 	const std::string error_message = "\n\n\
-    Please contact the author, Dr. Oleg Trott <ot14@columbia.edu>, so\n\
-    that this problem can be resolved. The reproducibility of the\n\
-    error may be vital, so please remember to include the following in\n\
-    your problem report:\n\
-    * the EXACT error message,\n\
-    * your version of the program,\n\
-    * the type of computer system you are running it on,\n\
-    * all command line options,\n\
-    * configuration file (if used),\n\
-    * ligand file as PDBQT,\n\
-    * receptor file as PDBQT,\n\
-    * flexible side chains file as PDBQT (if used),\n\
-    * output file as PDBQT (if any),\n\
-    * input (if possible),\n\
-    * random seed the program used (this is printed when the program starts).\n\
-    \n\
-    Thank you!\n";
+Please contact the author, Dr. Oleg Trott <ot14@columbia.edu>, so\n\
+that this problem can be resolved. The reproducibility of the\n\
+error may be vital, so please remember to include the following in\n\
+your problem report:\n\
+* the EXACT error message,\n\
+* your version of the program,\n\
+* the type of computer system you are running it on,\n\
+* all command line options,\n\
+* configuration file (if used),\n\
+* ligand file as PDBQT,\n\
+* receptor file as PDBQT,\n\
+* flexible side chains file as PDBQT (if used),\n\
+* output file as PDBQT (if any),\n\
+* input (if possible),\n\
+* random seed the program used (this is printed when the program starts).\n\
+\n\
+Thank you!\n";
 
-    const std::string begin_message =
-    "\n\
-    #################################################################\n\
-    #                                                               #\n\
-    #       VinaSH: a program optimized for sigma hole bonding      #\n\
-    #                                                               #\n\
-    #      Code modified from Autodock Vina by Grant Schmadeke      #\n\
-    #                   Sirimulla Research Group                    #\n\
-    #                St. Louis College of Pharmacy                  #\n\
-    #                www.sirimullaresearchgroup.com                 #\n\
-    #                                                               #\n\
-    # Please cite:                                                  #\n\
-    # Koebel, et al. 'Theory and Principals of Sulfur Bonding in    #\n\
-    # Protein-Ligand Interactions'                                  #\n\
-    # Journal of Chemical Information and Modeling xxx              #\n\
-    # Currently under review.                                       #\n\
-    #                                                               #\n\
-    #################################################################\n";
+	const std::string cite_message = "\
+############################################################################\n\
+# If you used Quick VinaSH in your work, please cite:                      #\n\
+#                                                                          #\n\
+# Mathew  Koebel, Aaron Cooper, Grant  Schmadeke, Soyoung Jeon,            #\n\
+# Mahesh Narayan, Suman  Sirimulla                                         #\n\
+# \“S---O, S---N sulfur bonding interactions in Protein-Ligand Complexes:   #\n\
+# Empirical Considerations and Scoring Function\” Journal of chemical       #\n\
+# Information and modeling, 2016, 56 (12), pp 2298–2309                    #\n\
+#                                                                          #\n\
+# Mathew Koebel, Grant Schmadeke, Richard G. Posner, Suman Sirimulla       #\n\
+#  \"AutoDock VinaXB: Implementation of XBSF, new empirical halogen bond    #\n\
+#  scoring function, into AutoDock Vina.\"                                  #\n\
+#  Journal of Cheminformatics  2016 8:27                                   #\n\
+#                                                                          #\n\
+#You are also encouraged to cite:                                          #\n\
+#QuickVina 2: Bioinformatics (2015), doi: 10.1093/bioinformatics/btv082    #\n\
+#Original AutoDock Vina paper: Journal of Computational Chemistry 31       #\n\
+#(2010) 455-461                                                            #\n\
+# doi: 10.1002/jcc.21334                                                   #\n\
+#                                                                          #\n\
+#      Quick VinaSH: a program optimized for sigma hole bonding            #\n\
+#                                                                          #\n\
+#      Code modified from Quick Vina 2 by Grant Schmadeke                  #\n\
+#                   Sirimulla Research Group                               #\n\
+#                 University of Texas at El Paso                           #\n\
+#                 www.sirimullaresearchgroup.com ​                         #\n\
+############################################################################\n";
     
     const std::string end_message =
     "\n\
@@ -471,10 +503,10 @@ int main(int argc, char* argv[]) {
     # For more information, please see github.com/ssirimulla/vinaSH #\n\
     # or visit www.sirimullaresearchgroup.com/software              #\n\
     #                                                               #\n\
-    #                  Thank you for using VinaSH                   #\n\
+    #             Thank you for using Quick VinaSH                  #\n\
     #                                                               #\n\
     #################################################################\n";
-
+    
 	try {
 		std::string rigid_name, ligand_name, flex_name, config_name, out_name, log_name;
 		fl center_x, center_y, center_z, size_x, size_y, size_z;
@@ -653,7 +685,7 @@ int main(int argc, char* argv[]) {
 				throw usage_error("Search space dimensions should be positive");
 		}
 
-		log << begin_message << '\n';
+		log << cite_message << '\n';
 
 		if(search_box_needed && size_x * size_y * size_z > 27e3) {
 			log << "WARNING: The search space volume > 27000 Angstrom^3 (See FAQ)\n";
@@ -733,7 +765,7 @@ int main(int argc, char* argv[]) {
 
     }
 	catch(file_error& e) {
-		std::cerr << "\n\nError: could not open \"" << e.name.string() << "\" for " << (e.in ? "reading" : "writing") << ".\n";
+		std::cerr << "\n\nError: could not open " << e.name << " for " << (e.in ? "reading" : "writing") << ".\n";
 		return 1;
 	}
 	catch(boost::filesystem::filesystem_error& e) {
@@ -745,7 +777,7 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 	catch(parse_error& e) {
-		std::cerr << "\n\nParse error on line " << e.line << " in file \"" << e.file.string() << "\": " << e.reason << '\n';
+		std::cerr << "\n\nParse error on line " << e.line << " in file " << e.file << ": " << e.reason << '\n';
 		return 1;
 	}
 	catch(std::bad_alloc&) {

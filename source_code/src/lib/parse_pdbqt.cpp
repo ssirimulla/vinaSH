@@ -99,7 +99,7 @@ T checked_convert_substring(const std::string& str, sz i, sz j, const std::strin
 }
 
 parsed_atom parse_pdbqt_atom_string(const std::string& str) {
-    unsigned number = checked_convert_substring<unsigned>(str, 7, 11, "atom number");
+	unsigned number = checked_convert_substring<unsigned>(str, 7, 11, "atom number");
 	vec coords(checked_convert_substring<fl>(str, 31, 38, "coordinate"),
 			   checked_convert_substring<fl>(str, 39, 46, "coordinate"),
 			   checked_convert_substring<fl>(str, 47, 54, "coordinate"));

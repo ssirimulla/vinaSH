@@ -20,6 +20,7 @@
 
 */
 
+//#include <boost/date_time/posix_time/posix_time.hpp> // for time in microseconds
 #include <algorithm> // fill, etc
 
 #if 0 // use binary cache
@@ -36,6 +37,7 @@
 #endif 
 
 #include <boost/serialization/split_member.hpp>
+#include <boost/thread/thread.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/static_assert.hpp>
 #include "cache.h"
@@ -108,7 +110,9 @@ void cache::load(Archive& ar, const unsigned version) {
 	ar & grids;
 }
 
-void cache::populate(const model& m, const precalculate& p, const szv& atom_types_needed, bool display_progress) {
+void cache::populateparalell(const model& m, const precalculate& p, const szv& atom_types_needed, bool display_progress, int noOfCpus) {
+using namespace boost::posix_time;
+//	ptime time_start1(microsec_clock::local_time());
 	szv needed;
 	VINA_FOR_IN(i, atom_types_needed) {
 		sz t = atom_types_needed[i];
@@ -117,6 +121,139 @@ void cache::populate(const model& m, const precalculate& p, const szv& atom_type
 			grids[t].init(gd);
 		}
 	}
+//	ptime time_end1(microsec_clock::local_time());
+//	time_duration duration1(time_end1 - time_start1);
+//	std::cout<< "first parallel part time: " << (duration1.total_milliseconds()/1000.0)<<std::endl;
+
+	if(needed.empty())
+		return;
+
+	grid& g = grids[needed.front()];
+
+	boost::thread_group threadGroup;
+	sz total = g.m_data.dim0() * g.m_data.dim1() * g.m_data.dim2();
+	int chunkSize = total / noOfCpus;
+//	std::cout << "CPUs = "<< noOfCpus << ", chunk size=" << chunkSize << std::endl;
+//	std::cout << "starting the 2nd parallel part..."<<std::endl;
+//	ptime time_start2(microsec_clock::local_time());
+
+	//do the parallel population part
+	for (int threadId = 0; threadId < noOfCpus; ++threadId) {
+		sz start=threadId*chunkSize;
+		if (threadId==noOfCpus-1 && total%noOfCpus != 0) {
+			chunkSize= total % noOfCpus;
+		}
+		boost::thread* th = new boost::thread(&cache::populateChunk, this,
+				threadId, m, needed, p, g, start, start + chunkSize);
+		threadGroup.add_thread(th);
+	}
+	threadGroup.join_all();
+//	ptime time_end2(microsec_clock::local_time());
+//	time_duration duration2(time_end2 - time_start2);
+//	std::cout << "finished the 2nd parallel part. time= "<<(duration2.total_milliseconds()/1000.0)<<std::endl;
+}
+
+void cache::populateChunk(int threadId, const model& m, const szv& needed, const precalculate& p, grid& g, sz start, sz end) {
+	std::cout<<"function called with threadId "<<threadId << std::endl;
+	flv affinities(needed.size());
+	sz nat = num_atom_types(atu);
+	const fl cutoff_sqr = p.cutoff_sqr();
+	grid_dims gd_reduced = szv_grid_dims(gd);
+	szv_grid ig(m, gd_reduced, cutoff_sqr);
+
+
+	sz lineLength=g.m_data.dim0();
+	sz linesCount=g.m_data.dim1();
+	sz area=lineLength*linesCount;
+//	sz levels=g.m_data.dim2();
+//	sz total=area*levels;
+
+	sz x, y, z, linearI;
+
+	for (linearI = start; linearI < end; ++linearI) {
+		x = (linearI % area) % lineLength;
+		y = (linearI % area) / lineLength;
+		z = (linearI / area);
+
+		std::fill(affinities.begin(), affinities.end(), 0);
+		vec probe_coords;
+		probe_coords = g.index_to_argument(x, y, z);
+		const szv& possibilities = ig.possibilities(probe_coords);
+		VINA_FOR_IN(possibilities_i, possibilities){
+			const sz i = possibilities[possibilities_i];
+			const atom& a = m.grid_atoms[i];
+			const sz t1 = a.get(atu);
+			if(t1 >= nat) continue;
+			const fl r2 = vec_distance_sqr(a.coords, probe_coords);
+						fl theta;
+            if (xs_is_halogen(a.xs)) {                      //find an angle if a halogen
+                const std::vector<bond>& bonds = a.bonds;
+                VINA_FOR_IN(j, bonds) {
+                    const bond& b = bonds[j];
+                    const atom& c = m.get_atom(b.connected_atom_index);
+                    if(c.el == EL_TYPE_C){              //the halogen needs to be connected to a carbon
+                        vec v1 = a.coords - c.coords;  //vector between halogen and carbon
+                        vec v2 = a.coords - probe_coords;
+                        theta = angle(v1, v2);
+                    }
+                }
+            }
+            if (xs_is_S(a.xs)) {                    //find an angle if a sulfur
+                const std::vector<bond>& bonds = a.bonds;
+                if (bonds.size() == 2) {          //sulfur must be bonded to exactly two carbons
+                    flv theta_holder;
+                    VINA_FOR_IN(j, bonds) {
+                        const bond& b = bonds[j];
+                        const atom& c = m.get_atom(b.connected_atom_index);
+                        if(c.ad == AD_TYPE_A){              //the sulfur needs to be connected to an aromatic carbon
+                            vec v1 = a.coords - c.coords;  //vector between sulfur and carbon
+                            vec v2 = a.coords - probe_coords;
+                            theta_holder.push_back(angle(v1, v2));
+                        }
+                        else {
+                            theta_holder.push_back(0);         //if the sulfur is bonded to a non-aromatic carbon, the angle is 0
+                        }
+                    }
+                    theta = theta_holder[0] > theta_holder[1] ? theta_holder[0] : theta_holder[1]; //only care about the bigger angle
+                }
+                else {                  //if the sulfur doesn't have exactly 2 bonds, set theat to 0
+                    theta = 0;
+                }
+            }
+			if(r2 <= cutoff_sqr) {
+				VINA_FOR_IN(j, needed) {
+					const sz t2 = needed[j];
+					assert(t2 < nat);
+					const sz type_pair_index = triangular_matrix_index_permissive(num_atom_types(atu), t1, t2);
+					affinities[j] += p.eval_fast(type_pair_index, r2, theta);
+				}
+			}
+		}
+		VINA_FOR_IN(j, needed){
+			sz t = needed[j];
+			assert(t < nat);
+			grids[t].m_data(x, y, z) = affinities[j];
+		}
+
+	}
+}
+
+void cache::populate(const model& m, const precalculate& p, const szv& atom_types_needed, bool display_progress) {
+using namespace boost::posix_time;
+//	ptime time_start1(microsec_clock::local_time());
+	szv needed;
+	VINA_FOR_IN(i, atom_types_needed) {
+		sz t = atom_types_needed[i];
+		if(!grids[t].initialized()) {
+			needed.push_back(t);
+			grids[t].init(gd);
+		}
+	}
+
+//	ptime time_end1(microsec_clock::local_time());
+//	time_duration duration1(time_end1 - time_start1);
+//	std::cout<< "first parallel part time: " << (duration1.total_milliseconds()/1000.0)<<std::endl;
+
 	if(needed.empty())
 		return;
 	flv affinities(needed.size());
@@ -129,6 +266,9 @@ void cache::populate(const model& m, const precalculate& p, const szv& atom_type
 
 	grid_dims gd_reduced = szv_grid_dims(gd);
 	szv_grid ig(m, gd_reduced, cutoff_sqr);
+
+//	std::cout << "starting the 2nd parallel part..."<<std::endl;
+//	ptime time_start2(microsec_clock::local_time());
 
 	VINA_FOR(x, g.m_data.dim0()) {
 		VINA_FOR(y, g.m_data.dim1()) {
@@ -196,4 +336,7 @@ void cache::populate(const model& m, const precalculate& p, const szv& atom_type
 			}
 		}
 	}
+//	ptime time_end2(microsec_clock::local_time());
+//	time_duration duration2(time_end2 - time_start2);
+//	std::cout << "finished the 2nd parallel part. time= "<<(duration2.total_milliseconds()/1000.0)<<std::endl;
 }

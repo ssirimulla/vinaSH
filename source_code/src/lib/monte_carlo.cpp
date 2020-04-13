@@ -25,19 +25,19 @@
 #include "mutate.h"
 #include "quasi_newton.h"
 
-output_type monte_carlo::operator()(model& m, const precalculate& p, const igrid& ig, const precalculate& p_widened, const igrid& ig_widened, const vec& corner1, const vec& corner2, incrementable* increment_me, rng& generator) const {
-	output_container tmp;
-	this->operator()(m, tmp, p, ig, p_widened, ig_widened, corner1, corner2, increment_me, generator); // call the version that produces the whole container
-	VINA_CHECK(!tmp.empty());
-	return tmp.front();
-}
+//output_type monte_carlo::operator()(model& m, const precalculate& p, const igrid& ig, const precalculate& p_widened, const igrid& ig_widened, const vec& corner1, const vec& corner2, incrementable* increment_me, rng& generator, visited* visited) const {
+//	output_container tmp;
+//	this->operator()(m, tmp, p, ig, p_widened, ig_widened, corner1, corner2, increment_me, generator, visited); // call the version that produces the whole container
+//	VINA_CHECK(!tmp.empty());
+//	return tmp.front();
+//}
 
 bool metropolis_accept(fl old_f, fl new_f, fl temperature, rng& generator) {
 	if(new_f < old_f) return true;
 	const fl acceptance_probability = std::exp((old_f - new_f) / temperature);
 	return random_fl(0, 1, generator) < acceptance_probability;
 }
-
+/*
 void monte_carlo::single_run(model& m, output_type& out, const precalculate& p, const igrid& ig, rng& generator) const {
 	conf_size s = m.get_size();
 	change g(s);
@@ -48,8 +48,10 @@ void monte_carlo::single_run(model& m, output_type& out, const precalculate& p, 
 	VINA_U_FOR(step, num_steps) {
 		output_type candidate(current.c, max_fl);
 		mutate_conf(candidate.c, m, mutation_amplitude, generator);
+		printf("check 1st\n");
 		quasi_newton_par(m, p, ig, candidate, g, hunt_cap);
 		if(step == 0 || metropolis_accept(current.e, candidate.e, temperature, generator)) {
+		printf("check 2nd\n");
 			quasi_newton_par(m, p, ig, candidate, g, authentic_v);
 			current = candidate;
 			if(current.e < out.e)
@@ -58,7 +60,8 @@ void monte_carlo::single_run(model& m, output_type& out, const precalculate& p, 
 	}
 	quasi_newton_par(m, p, ig, out, g, authentic_v);
 }
-
+*/
+/*
 void monte_carlo::many_runs(model& m, output_container& out, const precalculate& p, const igrid& ig, const vec& corner1, const vec& corner2, sz num_runs, rng& generator) const {
 	conf_size s = m.get_size();
 	VINA_FOR(run, num_runs) {
@@ -76,7 +79,7 @@ output_type monte_carlo::many_runs(model& m, const precalculate& p, const igrid&
 	VINA_CHECK(!tmp.empty());
 	return tmp.front();
 }
-
+*/
 
 // out is sorted
 void monte_carlo::operator()(model& m, output_container& out, const precalculate& p, const igrid& ig, const precalculate& p_widened, const igrid& ig_widened, const vec& corner1, const vec& corner2, incrementable* increment_me, rng& generator) const {
@@ -106,9 +109,9 @@ void monte_carlo::operator()(model& m, output_container& out, const precalculate
 				add_to_output_container(out, tmp, min_rmsd, num_saved_mins); // 20 - max size
 				if(tmp.e < best_e)
 					best_e = tmp.e;
-			}
-		}
-	}
+ 			}
+  		}
+ 	}
 	VINA_CHECK(!out.empty());
 	VINA_CHECK(out.front().e <= out.back().e); // make sure the sorting worked in the correct order
 }
